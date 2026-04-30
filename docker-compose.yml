@@ -1,0 +1,109 @@
+services:
+  # PostgreSQL 17
+  postgres:
+    image: postgres:17-alpine
+    container_name: components_postgres
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-components_db}
+      POSTGRES_USER: ${DB_USERNAME:-components_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-components_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    networks:
+      - components_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-components_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    container_name: components_redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    networks:
+      - components_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Laravel Backend (PHP-FPM)
+  backend:
+    build:
+      context: ../backend
+      dockerfile: ../docker/Dockerfile.backend
+    container_name: components_backend
+    working_dir: /var/www/html
+    volumes:
+      - ../backend:/var/www/html
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - components_network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # Nginx Web Server
+  nginx:
+    image: nginx:alpine
+    container_name: components_nginx
+    ports:
+      - "${NGINX_PORT:-80}:80"
+    volumes:
+      - ../backend:/var/www/html
+      - ../nginx/default.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - backend
+    networks:
+      - components_network
+
+  # Centrifugo (Realtime Chat)
+  centrifugo:
+    image: centrifugo/centrifugo:v5
+    container_name: components_centrifugo
+    command: centrifugo -c config.json
+    volumes:
+      - ../centrifugo/config.json:/centrifugo/config.json
+    ports:
+      - "${CENTRIFUGO_PORT:-8000}:8000"
+    networks:
+      - components_network
+    depends_on:
+      - redis
+
+  # Frontend (React - Vite dev server)
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: ../docker/Dockerfile.frontend
+    container_name: components_frontend
+    volumes:
+      - ../frontend:/app
+      - /app/node_modules
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    environment:
+      - VITE_API_URL=http://localhost:${NGINX_PORT:-80}/api
+      - VITE_CENTRIFUGO_URL=http://localhost:${CENTRIFUGO_PORT:-8000}
+    depends_on:
+      - backend
+    networks:
+      - components_network
+
+networks:
+  components_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local

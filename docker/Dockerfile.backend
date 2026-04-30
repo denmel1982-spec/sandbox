@@ -1,0 +1,41 @@
+# Backend Dockerfile для Laravel 11 + PHP 8.3
+FROM php:8.3-fpm
+
+# Установка системных зависимостей
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    libpng-dev \
+    libonig-dev \
+    libxml2-dev \
+    libzip-dev \
+    zip \
+    unzip \
+    libpq-dev \
+    && docker-php-ext-install pdo_pgsql pgsql \
+    && docker-php-ext-install mbstring exif pcntl bcmath gd zip \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Установка Composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+# Создание пользователя для запуска приложения
+RUN useradd -G www-data,root -u 1000 -d /home/appuser appuser
+RUN mkdir -p /home/appuser/.composer && \
+    chown -R appuser:appuser /home/appuser
+
+# Рабочая директория
+WORKDIR /var/www/html
+
+# Копирование файлов приложения
+COPY --chown=appuser:www-data . /var/www/html
+
+# Установка прав доступа
+RUN chmod -R 755 /var/www/html/storage
+
+USER appuser
+
+EXPOSE 9000
+
+CMD ["php-fpm"]
