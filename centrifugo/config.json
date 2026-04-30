@@ -1,0 +1,62 @@
+{
+  "admin": false,
+  "api_key": "",
+  "allow_subscribe_for_client": true,
+  "allow_history_for_client": true,
+  "allow_presence_for_client": true,
+  "token_hmac_secret_key": "secret-key-change-in-production",
+  "allowed_origins": ["*"],
+  "log_level": "info",
+  "log_file": "/dev/stdout",
+  "port": 8000,
+  "engine": {
+    "type": "redis",
+    "redis": {
+      "address": "redis:6379",
+      "db": 0,
+      "use_lists": false,
+      "prefix": "centrifugo"
+    }
+  },
+  "client": {
+    "proxy_connect_address": "redis:6379",
+    "refresh_interval": 30,
+    "presence_update_interval": 30,
+    "recover_max_publication_limit": 1000,
+    "history_max_publication_limit": 1000
+  },
+  "namespaces": [
+    {
+      "name": "chat",
+      "force_recovery": true,
+      "history_size": 100,
+      "history_ttl": "24h",
+      "presence": true,
+      "join_leave": true
+    },
+    {
+      "name": "notifications",
+      "force_recovery": true,
+      "history_size": 50,
+      "history_ttl": "1h",
+      "presence": false,
+      "join_leave": false
+    },
+    {
+      "name": "announcements",
+      "force_recovery": false,
+      "history_size": 20,
+      "history_ttl": "6h",
+      "presence": false,
+      "join_leave": false
+    }
+  ],
+  "http_api": {
+    "key": "api-key-change-in-production",
+    "secret": "api-secret-change-in-production"
+  },
+  "tls": false,
+  "tls_cert": "",
+  "tls_key": "",
+  "tls_root_ca": ""
+}
